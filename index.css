@@ -1,0 +1,25 @@
+.footer-shortcuts {
+    padding: 10px;
+    /* background-color: #f5f5f5; */
+}
+
+.footer-shortcuts .header {
+    font-size: 14px;
+    margin: 0; /* reduce or eliminate margin to conserve horizontal space */
+}
+
+.footer-shortcuts .input-group-prepend {
+    font-size: 12px; /* reduce font size if necessary */
+}
+
+.footer-shortcuts .form-control {
+    width: 40px;  /* adjust width */
+    height: 30px; /* adjust height to save vertical space */
+    font-size: 12px; /* reduce font size to fit the reduced space */
+}
+
+.footer-shortcuts .btn {
+    padding: 0 10px;
+    font-size: 12px;
+    height: 30px;
+}

@@ -3,6 +3,7 @@ const Store = require('electron-store');
 const store = new Store();
 const path = require('path');
 var AutoLaunch = require('auto-launch');
+const { autoUpdater } = require('electron-updater');
 
 
 let win;
@@ -19,6 +20,42 @@ let overlayTimeout; // Declare this outside the showOverlay function
 // When the app starts, retrieve stored shortcuts (if any):
 backwardShortcutValue = store.get('backwardShortcut', 'CmdOrCtrl+B');
 forwardShortcutValue = store.get('forwardShortcut', 'CmdOrCtrl+N');
+
+autoUpdater.on('update-available', () => {
+    dialog
+      .showMessageBox({
+        type: 'info',
+        title: 'Found Updates',
+        message: 'Found updates, do you want download updates in background now?',
+        buttons: ['Sure', 'No'],
+      })
+      .then((result) => {
+        const buttonIndex = result.response;
+        if (buttonIndex === 0) {
+          autoUpdater.downloadUpdate();
+        }
+      });
+  });
+  
+  autoUpdater.on('update-downloaded', () => {
+    dialog
+      .showMessageBox({
+        type: 'info',
+        title: 'Install Updates',
+        message: 'Updates downloaded, application will be quit for update...',
+        buttons: ['Sure', 'No, Later'],
+      })
+      .then((result) => {
+        const buttonIndex = result.response;
+        if (buttonIndex === 0) {
+          setImmediate(() => autoUpdater.quitAndInstall());
+        }
+      });
+  });
+  
+  autoUpdater.on('error', (err) => {
+    dialog.showErrorBox('Error: ', err.message || err.toString());
+  });
 
 // set up auto launch on mac
 
@@ -233,6 +270,10 @@ function createWindow() {
         e.preventDefault();
         win.hide();
     });
+
+    win.on('ready-to-show', () => {
+          autoUpdater.checkForUpdatesAndNotify();
+      });
 }
 
 function setupTray() {

@@ -8,7 +8,7 @@
   "scripts": {
     "start": "electron index.js",
     "test": "echo \"Error: no test specified\" && exit 1",
-    "dist": "electron-builder -mw"
+    "dist": "electron-builder -mw --publish always"
   },
   "dependencies": {
     "auto-launch": "^5.0.6",
@@ -22,5 +22,12 @@
     "electron": "^26.1.0",
     "electron-builder": "^24.6.3",
     "electron-rebuild": "^3.2.9"
+  },
+  "build": {
+    "publish": {
+      "provider": "s3",
+      "bucket": "clipboard-release",
+      "region": "us-east-1"
+    }
   }
 }

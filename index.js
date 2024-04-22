@@ -1,10 +1,18 @@
-const { app, BrowserWindow, ipcMain, clipboard, Tray, Menu, globalShortcut } = require('electron');
-const Store = require('electron-store');
+const {
+  app,
+  BrowserWindow,
+  ipcMain,
+  clipboard,
+  Tray,
+  Menu,
+  globalShortcut,
+} = require("electron");
+const Store = require("electron-store");
 const store = new Store();
-const path = require('path');
-var AutoLaunch = require('auto-launch');
-const { autoUpdater } = require('electron-updater');
-
+const path = require("path");
+var AutoLaunch = require("auto-launch");
+const { autoUpdater } = require("electron-updater");
+const { reverse } = require("dns");
 
 let win;
 let tray = null;
@@ -12,146 +20,156 @@ let clipboardQueue = [];
 let clipboardQueueLimit = 50; // limit to 100 items, you can change this to any desired value
 let copiedHistory = []; // to store the last 10 copied items
 const copiedHistoryLimit = 50; // limit to 10 items, you can change this to any desired value
-let previousClip = '';  // to store the previous clipboard content
+let previousClip = ""; // to store the previous clipboard content
 let overlay;
 let overlayTimeout; // Declare this outside the showOverlay function
 
-
+store.clear();
 // When the app starts, retrieve stored shortcuts (if any):
-backwardShortcutValue = store.get('backwardShortcut', 'CmdOrCtrl+B');
-forwardShortcutValue = store.get('forwardShortcut', 'CmdOrCtrl+N');
+backwardShortcutValue = store.get("backwardShortcut", "CmdOrCtrl+B");
+forwardShortcutValue = store.get("forwardShortcut", "CmdOrCtrl+N");
+reverseAllShortcutValue = store.get("reverseAllShortcut", "CmdOrCtrl+S");
 
-autoUpdater.on('update-available', () => {
-    dialog
-      .showMessageBox({
-        type: 'info',
-        title: 'Found Updates',
-        message: 'Found updates, do you want download updates in background now?',
-        buttons: ['Sure', 'No'],
-      })
-      .then((result) => {
-        const buttonIndex = result.response;
-        if (buttonIndex === 0) {
-          autoUpdater.downloadUpdate();
-        }
-      });
-  });
-  
-  autoUpdater.on('update-downloaded', () => {
-    dialog
-      .showMessageBox({
-        type: 'info',
-        title: 'Install Updates',
-        message: 'Updates downloaded, application will be quit for update...',
-        buttons: ['Sure', 'No, Later'],
-      })
-      .then((result) => {
-        const buttonIndex = result.response;
-        if (buttonIndex === 0) {
-          setImmediate(() => autoUpdater.quitAndInstall());
-        }
-      });
-  });
-  
-  autoUpdater.on('error', (err) => {
-    dialog.showErrorBox('Error: ', err.message || err.toString());
-  });
+autoUpdater.on("update-available", () => {
+  dialog
+    .showMessageBox({
+      type: "info",
+      title: "Found Updates",
+      message: "Found updates, do you want download updates in background now?",
+      buttons: ["Sure", "No"],
+    })
+    .then((result) => {
+      const buttonIndex = result.response;
+      if (buttonIndex === 0) {
+        autoUpdater.downloadUpdate();
+      }
+    });
+});
+
+autoUpdater.on("update-downloaded", () => {
+  dialog
+    .showMessageBox({
+      type: "info",
+      title: "Install Updates",
+      message: "Updates downloaded, application will be quit for update...",
+      buttons: ["Sure", "No, Later"],
+    })
+    .then((result) => {
+      const buttonIndex = result.response;
+      if (buttonIndex === 0) {
+        setImmediate(() => autoUpdater.quitAndInstall());
+      }
+    });
+});
+
+autoUpdater.on("error", (err) => {
+  dialog.showErrorBox("Error: ", err.message || err.toString());
+});
 
 // set up auto launch on mac
 
-if (process.platform === 'darwin') {
-    var macAutoLauncher = new AutoLaunch({
-        name: 'Clipboard Q',
-        path: '/Applications/Clipboard Q.app',
+if (process.platform === "darwin") {
+  var macAutoLauncher = new AutoLaunch({
+    name: "Clipboard Q",
+    path: "/Applications/Clipboard Q.app",
+  });
 
-    });
-
-    macAutoLauncher.isEnabled().then(function (isEnabled) {
-        if (isEnabled) return;
-        macAutoLauncher.enable();
-    }).catch(function (err) {
-        // handle error
-    });
-}
-
-if (process.platform === 'win32') {
-    // set up auto launch on windows
-    var winAutoLauncher = new AutoLaunch({
-        name: 'Clipboard Q',
-        path: 'C:\\Program Files\\Clipboard Q\\Clipboard Q.exe',
-
-    });
-
-    winAutoLauncher.isEnabled().then(function (isEnabled) {
-        if (isEnabled) return;
-        winAutoLauncher.enable();
-    }).catch(function (err) {
-        // handle error
+  macAutoLauncher
+    .isEnabled()
+    .then(function (isEnabled) {
+      if (isEnabled) return;
+      macAutoLauncher.enable();
+    })
+    .catch(function (err) {
+      // handle error
     });
 }
 
-ipcMain.on('update-shortcuts', (event, data) => {
+if (process.platform === "win32") {
+  // set up auto launch on windows
+  var winAutoLauncher = new AutoLaunch({
+    name: "Clipboard Q",
+    path: "C:\\Program Files\\Clipboard Q\\Clipboard Q.exe",
+  });
 
-    // Unregister the old shortcuts
-    globalShortcut.unregister(backwardShortcutValue);
-    globalShortcut.unregister(forwardShortcutValue);
-
-    // Update to new shortcuts
-    backwardShortcutValue = data.backward || backwardShortcutValue;
-    forwardShortcutValue = data.forward || forwardShortcutValue;
-    win.webContents.send('shortcuts', {
-        backward: backwardShortcutValue,
-        forward: forwardShortcutValue
+  winAutoLauncher
+    .isEnabled()
+    .then(function (isEnabled) {
+      if (isEnabled) return;
+      winAutoLauncher.enable();
+    })
+    .catch(function (err) {
+      // handle error
     });
+}
 
+ipcMain.on("update-shortcuts", (event, data) => {
+  // Unregister the old shortcuts
+  globalShortcut.unregister(backwardShortcutValue);
+  globalShortcut.unregister(forwardShortcutValue);
+  globalShortcut.unregister(reverseAllShortcutValue);
 
+  // Update to new shortcuts
+  backwardShortcutValue = data.backward || backwardShortcutValue;
+  forwardShortcutValue = data.forward || forwardShortcutValue;
+  reverseAllShortcutValue = data.reverseAll || reverseAllShortcutValue;
 
-    const ret = globalShortcut.register(backwardShortcutValue, () => {
-        backwardShortcut();
-    });
+  win.webContents.send("shortcuts", {
+    backward: backwardShortcutValue,
+    forward: forwardShortcutValue,
+    reverseAll: reverseAllShortcutValue,
+  });
 
-    const ret2 = globalShortcut.register(forwardShortcutValue, () => {
-        forwardShortcut();
-    });
+  const ret = globalShortcut.register(backwardShortcutValue, () => {
+    backwardShortcut();
+  });
 
+  const ret2 = globalShortcut.register(forwardShortcutValue, () => {
+    forwardShortcut();
+  });
 
-    if (!ret || !ret2) {
-        console.log('Registration of global shortcut failed.');
-    }
+  const ret3 = globalShortcut.register(reverseAllShortcutValue, () => {
+    reverseAllShortcut();
+  });
 
-    store.set('backwardShortcut', backwardShortcutValue);
-    store.set('forwardShortcut', forwardShortcutValue);
+  if (!ret || !ret2 || !ret3) {
+    console.log("Registration of global shortcut failed.");
+  }
+
+  store.set("backwardShortcut", backwardShortcutValue);
+  store.set("forwardShortcut", forwardShortcutValue);
+  store.set("reverseAllShortcut", reverseAllShortcutValue);
 });
 
 function createOverlay() {
-    const { screen } = require('electron');
-    const primaryDisplay = screen.getPrimaryDisplay();
-    const { width } = primaryDisplay.workAreaSize;
+  const { screen } = require("electron");
+  const primaryDisplay = screen.getPrimaryDisplay();
+  const { width } = primaryDisplay.workAreaSize;
 
-    overlay = new BrowserWindow({
-        width: 300,
-        height: 100,
-        x: width - 310,
-        y: 10,
-        frame: false,
-        alwaysOnTop: true,
-        transparent: true,
-        focusable: false,
-        skipTaskbar: true,
-        opacity: 0,
+  overlay = new BrowserWindow({
+    width: 300,
+    height: 100,
+    x: width - 310,
+    y: 10,
+    frame: false,
+    alwaysOnTop: true,
+    transparent: true,
+    focusable: false,
+    skipTaskbar: true,
+    opacity: 0,
 
-        webPreferences: {
-            nodeIntegration: true,
-            contextIsolation: false,
-            backgroundThrottling: false
-        },
-        backgroundColor: '#000000',
+    webPreferences: {
+      nodeIntegration: true,
+      contextIsolation: false,
+      backgroundThrottling: false,
+    },
+    backgroundColor: "#000000",
+  });
 
-    });
+  overlay.setIgnoreMouseEvents(true);
 
-    overlay.setIgnoreMouseEvents(true);
-
-    overlay.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(`
+  overlay.loadURL(
+    `data:text/html;charset=utf-8,${encodeURIComponent(`
         <script>
             const { ipcRenderer } = require('electron');
             
@@ -169,232 +187,249 @@ function createOverlay() {
             background-color: rgba(255, 255, 255, 0.6);
             height: 30px;
             font-family: monospace;"></div>
-    `)}`);
+    `)}`
+  );
 }
 
-
 function showOverlay(content) {
-    const displayContent = content.split('\n').join(' ').substring(0, 50) + (content.length > 50 ? '...' : '');
+  const displayContent =
+    content.split("\n").join(" ").substring(0, 50) +
+    (content.length > 50 ? "..." : "");
 
-    if (overlayTimeout) {
-        clearTimeout(overlayTimeout);
-    }
+  if (overlayTimeout) {
+    clearTimeout(overlayTimeout);
+  }
 
-    if (!overlay) {
-        createOverlay();
-    }
+  if (!overlay) {
+    createOverlay();
+  }
 
-    overlay.webContents.send('update-content', {
-        title: 'Clipboard Q',
-        content: displayContent
-    });
+  overlay.webContents.send("update-content", {
+    title: "Clipboard Q",
+    content: displayContent,
+  });
 
-    overlay.setOpacity(1); // Make the overlay visible
+  overlay.setOpacity(1); // Make the overlay visible
 
-    overlayTimeout = setTimeout(() => {
-        if (overlay) overlay.setOpacity(0);  // Make the overlay transparent
-    }, 3000);
+  overlayTimeout = setTimeout(() => {
+    if (overlay) overlay.setOpacity(0); // Make the overlay transparent
+  }, 3000);
 }
 
 function forwardShortcut() {
-    if (clipboardQueue.length > 0) {
-        const textToPaste = clipboardQueue.shift();
-        clipboard.writeText(textToPaste);
-        copiedHistory.unshift(previousClip);
-        previousClip = textToPaste;
-        clipboard.writeText(textToPaste);
-        showOverlay(textToPaste);
+  if (clipboardQueue.length > 0) {
+    const textToPaste = clipboardQueue.shift();
+    clipboard.writeText(textToPaste);
+    copiedHistory.unshift(previousClip);
+    previousClip = textToPaste;
+    clipboard.writeText(textToPaste);
+    showOverlay(textToPaste);
 
-        // if there is an item in the queue, 
-        while (clipboardQueue.length > clipboardQueueLimit) {
-            clipboardQueue.pop();
-        }
-
-
-
-    } else {
-        showOverlay(clipboard.readText());
-
+    // if there is an item in the queue,
+    while (clipboardQueue.length > clipboardQueueLimit) {
+      clipboardQueue.pop();
     }
+  } else {
+    showOverlay(clipboard.readText());
+  }
 }
+
+function reverseAllShortcut() {
+  let itemsToPaste = [];
+ console.log("reverseAllShortcut : ",copiedHistory.length);
+  if (copiedHistory.length > 0) {
+    // Reverse the clipboard items starting from the designated start point
+    itemsToPaste = copiedHistory.slice(0); // Copy the array
+    itemsToPaste.reverse(); // Reverse the copied array
+    let textToPaste = "";
+    // Simulate pasting each item
+    itemsToPaste.forEach((item) => {
+      textToPaste += " " + item;
+    });
+    clipboard.writeText(textToPaste);
+    showOverlay(textToPaste);
+  } else {
+    showOverlay(clipboard.readText()); // Show the current item in the clipboard if queue is empty
+  }
+}
+
 function backwardShortcut() {
-    if (copiedHistory.length > 0) {
-        // go back in clipboard history
-        const textToPaste = copiedHistory.shift();
-        clipboardQueue.unshift(previousClip);
-        previousClip = textToPaste;
-        clipboard.writeText(textToPaste);
-        showOverlay(textToPaste);
-        // if there is an item in the queue, 
-        while (clipboardQueue.length > clipboardQueueLimit) {
-            clipboardQueue.pop();
-        }
-
-    } else {
-        showOverlay(clipboard.readText());
-
+  if (copiedHistory.length > 0) {
+    // go back in clipboard history
+    const textToPaste = copiedHistory.shift();
+    clipboardQueue.unshift(previousClip);
+    previousClip = textToPaste;
+    clipboard.writeText(textToPaste);
+    showOverlay(textToPaste);
+    // if there is an item in the queue,
+    while (clipboardQueue.length > clipboardQueueLimit) {
+      clipboardQueue.pop();
     }
+  } else {
+    showOverlay(clipboard.readText());
+  }
 }
-
 
 function createWindow() {
-    // on mac make title bar hidden and on windows make it visible
-    let titleBarStyle = 'hidden';
-    if (process.platform === 'win32') {
-        // just show close button
+  // on mac make title bar hidden and on windows make it visible
+  let titleBarStyle = "hidden";
+  if (process.platform === "win32") {
+    // just show close button
+  }
 
-    }
+  win = new BrowserWindow({
+    width: 600,
+    height: 500,
+    // dont allow resizing or zooming
+    resizable: false,
+    zoomable: false,
+    // make the tite bar draggable
+    titleBarStyle: titleBarStyle,
+    titleBarOverlay: true,
 
-    win = new BrowserWindow({
-        width: 600,
-        height: 500,
-        // dont allow resizing or zooming
-        resizable: false,
-        zoomable: false,
-        // make the tite bar draggable
-        titleBarStyle: titleBarStyle,
-        titleBarOverlay: true,
+    webPreferences: {
+      nodeIntegration: true,
+      contextIsolation: false,
+      backgroundThrottling: false,
+    },
+  });
 
-        webPreferences: {
-            nodeIntegration: true,
-            contextIsolation: false,
-            backgroundThrottling: false
-        },
-    });
+  win.loadFile("index.html");
+  win.on("close", (e) => {
+    e.preventDefault();
+    win.hide();
+  });
 
-
-
-    win.loadFile('index.html');
-
-    win.on('close', (e) => {
-        e.preventDefault();
-        win.hide();
-    });
-
-    win.on('ready-to-show', () => {
-          autoUpdater.checkForUpdatesAndNotify();
-      });
+  win.on("ready-to-show", () => {
+    autoUpdater.checkForUpdatesAndNotify();
+  });
 }
 
 function setupTray() {
-    // if platform is darwin, then create a tray icon
-    if (process.platform == 'darwin') {
-        const iconPath = path.join(__dirname, 'assets', 'iconTemplate@2x.png');
-        tray = new Tray(iconPath);
-    } else {
-        // load in .ico file
-        const iconPath = path.join(__dirname, 'assets', 'favicon.ico');
-        tray = new Tray(iconPath);
-    }
+  // if platform is darwin, then create a tray icon
+  if (process.platform == "darwin") {
+    const iconPath = path.join(__dirname, "assets", "iconTemplate@2x.png");
+    tray = new Tray(iconPath);
+  } else {
+    // load in .ico file
 
-    // when the tray icon is clicked, show the window
-    tray.on('click', () => {
+    const iconPath = path.join(__dirname, "assets", "favicon.ico");
+    tray = new Tray(iconPath);
+  }
+
+  // when the tray icon is clicked, show the window
+  tray.on("click", () => {
+    win.show();
+  });
+
+  const contextMenu = Menu.buildFromTemplate([
+    {
+      label: "Show",
+      click: () => {
         win.show();
-    });
-
-    const contextMenu = Menu.buildFromTemplate([
-        {
-            label: 'Show',
-            click: () => {
-                win.show();
-            }
-        },
-        {
-            label: 'Quit',
-            click: () => {
-                app.isQuitting = true;
-                app.exit();
-            }
-        }
-    ]);
-    tray.setContextMenu(contextMenu);
-    tray.setToolTip('Clipboard Queue');
-
+      },
+    },
+    {
+      label: "Quit",
+      click: () => {
+        app.isQuitting = true;
+        app.exit();
+      },
+    },
+  ]);
+  tray.setContextMenu(contextMenu);
+  tray.setToolTip("Clipboard Queue");
 }
 app.whenReady().then(() => {
-    if (process.platform === 'darwin') {  // Ensure the app is running on macOS
-        app.dock.hide();
-        // when the dock icon is clicked, show the window
-        app.on('activate', () => {
-            win.show();
-        }
-        );
-    }
-    if (!overlay) {
-        createOverlay();
-    }
+  if (process.platform === "darwin") {
+    // Ensure the app is running on macOS
+    app.dock.hide();
+    // when the dock icon is clicked, show the window
+    app.on("activate", () => {
+      win.show();
+    });
+  }
+  if (!overlay) {
+    createOverlay();
+  }
 
-    // after the window is created, setup the tray
+  // after the window is created, setup the tray
+  createWindow();
+  setupTray();
+
+  // Global shortcut registration
+
+  const ret = globalShortcut.register(backwardShortcutValue, () => {
+    backwardShortcut();
+  });
+
+  const ret2 = globalShortcut.register(forwardShortcutValue, () => {
+    forwardShortcut();
+  });
+
+  const ret3 = globalShortcut.register(reverseAllShortcutValue, () => {
+    reverseAllShortcut();
+  });
+
+  win.webContents.send("shortcuts", {
+    backward: backwardShortcutValue,
+    forward: forwardShortcutValue,
+    reverseAll: reverseAllShortcutValue,
+  });
+
+  // Clipboard polling mechanism
+  setInterval(() => {
+    const currentClip = clipboard.readText();
+    if (currentClip !== previousClip) {
+      copiedHistory.unshift(previousClip);
+      previousClip = currentClip;
+
+      // if there is an item in the queue,
+      if (copiedHistory.length > copiedHistoryLimit) {
+        copiedHistory.pop();
+      }
+    }
+  }, 100); // Check every second
+
+  if (!ret) {
+    console.log("ret : Registration of global shortcut failed.");
+  }
+  if (!ret2) {
+    console.log("ret2: Registration of global shortcut failed.");
+  }
+
+  if (!ret3) {
+    console.log("ret3: Registration of global shortcut failed.");
+  }
+});
+
+app.on("will-quit", () => {
+  // Cleanup: Unregister global shortcuts
+  globalShortcut.unregisterAll();
+});
+
+app.on("window-all-closed", (e) => {
+  e.preventDefault(); // Prevent the app from quitting completely
+});
+
+app.on("activate", () => {
+  if (BrowserWindow.getAllWindows().length === 0) {
     createWindow();
-    setupTray();
-
-    // Global shortcut registration
-
-    const ret = globalShortcut.register(backwardShortcutValue, () => {
-        backwardShortcut();
-
-    });
-
-    const ret2 = globalShortcut.register(forwardShortcutValue, () => {
-        forwardShortcut();
-
-    });
-
-    win.webContents.send('shortcuts', {
-        backward: backwardShortcutValue,
-        forward: forwardShortcutValue
-    });
-
-    // Clipboard polling mechanism
-    setInterval(() => {
-        const currentClip = clipboard.readText();
-        if (currentClip !== previousClip) {
-            copiedHistory.unshift(previousClip);
-            previousClip = currentClip;
-
-            // if there is an item in the queue, 
-            if (copiedHistory.length > copiedHistoryLimit) {
-                copiedHistory.pop();
-            }
-        }
-    }, 100);  // Check every second
-
-    if (!ret) {
-        console.log('Registration of global shortcut failed.');
-    }
-    if (!ret2) {
-        console.log('Registration of global shortcut failed.');
-    }
-
+  }
 });
 
-app.on('will-quit', () => {
-    // Cleanup: Unregister global shortcuts
-    globalShortcut.unregisterAll();
-});
-
-app.on('window-all-closed', (e) => {
-    e.preventDefault(); // Prevent the app from quitting completely
-});
-
-app.on('activate', () => {
-    if (BrowserWindow.getAllWindows().length === 0) {
-        createWindow();
-    }
-});
-
-ipcMain.on('set-queue', (event, data) => {
-    clipboardQueue = data.split('\n');
-});
-
+ipcMain.on("set-queue", (event, data) => 
+  clipboardQueue = data.split("\n")
+);
 
 // ... other main process code ...
 
-ipcMain.on('get-shortcuts', (event) => {
-    // assuming you have a function or way to get the current shortcuts
-    // const shortcuts = getCurrentShortcuts();
-    win.webContents.send('shortcuts', {
-        backward: backwardShortcutValue,
-        forward: forwardShortcutValue
-    });
+ipcMain.on("get-shortcuts", (event) => {
+  // assuming you have a function or way to get the current shortcuts
+  // const shortcuts = getCurrentShortcuts();
+  win.webContents.send("shortcuts", {
+    backward: backwardShortcutValue,
+    forward: forwardShortcutValue,
+    reverseAll: reverseAllShortcutValue,
+  });
 });

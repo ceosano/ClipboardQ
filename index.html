@@ -57,6 +57,10 @@
         .input-group>.form-control {
             border-left: none;
         }
+        
+        #set-shortcuts {
+            height:auto
+        }
     </style>
 </head>
 
@@ -93,7 +97,13 @@
                     <input id="forward-shortcut" type="text" class="form-control mx-2" maxlength="1" placeholder="N"
                         required>
                 </div>
-    
+                <div class="d-flex align-items-center">
+                    <div class="input-group-prepend">
+                        All Clip:
+                    </div>
+                    <input id="reverse-shortcut" type="text" class="form-control mx-2" maxlength="1" placeholder="S"
+                        required>
+                </div>
                 <button id="set-shortcuts" type="submit" class="btn btn-primary">Update Shortcuts</button>
             </form>
             <!-- </div> -->
@@ -125,10 +135,11 @@
 
         ipcRenderer.on('shortcuts', (event, shortcuts) => {
             // document.getElementById('shortcutsDisplay').innerHTML = `Current Shortcuts: Backwards: ${shortcuts.backward} Forwards: ${shortcuts.forward}`;
-
+            console.log("shortcuts",shortcuts);
             // Update placeholders based on received data
             document.getElementById('backward-shortcut').placeholder = shortcuts.backward.replace('CmdOrCtrl+', '');
             document.getElementById('forward-shortcut').placeholder = shortcuts.forward.replace('CmdOrCtrl+', '');
+            document.getElementById('reverse-shortcut').placeholder = shortcuts.reverseAll.replace('CmdOrCtrl+', '');
             console.log("shortcuts: ", shortcuts);
         });
 
@@ -147,7 +158,8 @@
 
             const backward = "CmdOrCtrl+" + document.getElementById('backward-shortcut').value;
             const forward = "CmdOrCtrl+" + document.getElementById('forward-shortcut').value;
-            ipcRenderer.send('update-shortcuts', { backward, forward });
+            const reverseAll = "CmdOrCtrl+" + document.getElementById('reverse-shortcut').value;
+            ipcRenderer.send('update-shortcuts', { backward, forward, reverseAll });
             alert('Shortcuts updated!');
         });
 

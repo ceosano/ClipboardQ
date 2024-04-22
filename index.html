@@ -93,6 +93,14 @@
                     <input id="forward-shortcut" type="text" class="form-control mx-2" maxlength="1" placeholder="N"
                         required>
                 </div>
+
+                <div class="d-flex align-items-center">
+                  <div class="input-group-prepend">
+                      Seq. Paste:
+                  </div>
+                  <input id="sequential-shortcut" type="text" class="form-control mx-2" maxlength="1" placeholder="K"
+                      required>
+              </div>
     
                 <button id="set-shortcuts" type="submit" class="btn btn-primary">Update Shortcuts</button>
             </form>
@@ -105,7 +113,10 @@
 
     style="height: 320px;"
             placeholder="Enter sequence you want to load into the clipboard. Seperate each clip with a new line."></textarea>
-        <button class="btn btn-primary w-100" onclick="setQueue()">Load Lines to Clipboard</button>
+            <div class="d-flex flex-row justify-content-between align-items-center">
+              <button class="btn w-50" style="margin-right:10px;" onclick="clearClipboard()">Clear Clipboard</button>
+              <button class="btn btn-primary w-100" onclick="setQueue()">Load Lines to Clipboard</button>
+            </div>
     </div>
 
 
@@ -129,6 +140,7 @@
             // Update placeholders based on received data
             document.getElementById('backward-shortcut').placeholder = shortcuts.backward.replace('CmdOrCtrl+', '');
             document.getElementById('forward-shortcut').placeholder = shortcuts.forward.replace('CmdOrCtrl+', '');
+            document.getElementById('sequential-shortcut').placeholder = shortcuts.sequential.replace('CmdOrCtrl+', '');
             console.log("shortcuts: ", shortcuts);
         });
 
@@ -142,12 +154,17 @@
             alert('Queue is empty!');
         });
 
+        function clearClipboard() {
+            ipcRenderer.send('clear-clipboard');
+        }
+
         document.getElementById('shortcutForm').addEventListener('submit', (e) => {
             e.preventDefault(); // Prevent form submission
 
             const backward = "CmdOrCtrl+" + document.getElementById('backward-shortcut').value;
             const forward = "CmdOrCtrl+" + document.getElementById('forward-shortcut').value;
-            ipcRenderer.send('update-shortcuts', { backward, forward });
+            const sequential = "CmdOrCtrl+" + document.getElementById('sequential-shortcut').value;
+            ipcRenderer.send('update-shortcuts', { backward, forward, sequential });
             alert('Shortcuts updated!');
         });
 

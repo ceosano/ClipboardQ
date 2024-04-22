@@ -16,9 +16,11 @@
     "electron-localshortcut": "^3.2.1",
     "electron-reload": "^2.0.0-alpha.1",
     "electron-store": "^8.1.0",
-    "electron-updater": "^6.1.1"
+    "electron-updater": "^6.1.1",
+    "robotjs": "^0.6.0"
   },
   "devDependencies": {
+    "@electron/rebuild": "^3.6.0",
     "electron": "^26.1.0",
     "electron-builder": "^24.6.3",
     "electron-rebuild": "^3.2.9"

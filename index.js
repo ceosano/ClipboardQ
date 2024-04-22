@@ -4,6 +4,7 @@ const store = new Store();
 const path = require('path');
 var AutoLaunch = require('auto-launch');
 const { autoUpdater } = require('electron-updater');
+const robot = require('robotjs')
 
 
 let win;
@@ -15,11 +16,13 @@ const copiedHistoryLimit = 50; // limit to 10 items, you can change this to any 
 let previousClip = '';  // to store the previous clipboard content
 let overlay;
 let overlayTimeout; // Declare this outside the showOverlay function
+let firstPressToSeq = true
 
 
 // When the app starts, retrieve stored shortcuts (if any):
 backwardShortcutValue = store.get('backwardShortcut', 'CmdOrCtrl+B');
 forwardShortcutValue = store.get('forwardShortcut', 'CmdOrCtrl+N');
+sequentialShortcutValue = store.get('sequentialShortcut', 'CmdOrCtrl+K');
 
 autoUpdater.on('update-available', () => {
     dialog
@@ -95,13 +98,16 @@ ipcMain.on('update-shortcuts', (event, data) => {
     // Unregister the old shortcuts
     globalShortcut.unregister(backwardShortcutValue);
     globalShortcut.unregister(forwardShortcutValue);
+    globalShortcut.unregister(sequentialShortcutValue);
 
     // Update to new shortcuts
     backwardShortcutValue = data.backward || backwardShortcutValue;
     forwardShortcutValue = data.forward || forwardShortcutValue;
+    sequentialShortcutValue = data.sequential || sequentialShortcutValue;
     win.webContents.send('shortcuts', {
         backward: backwardShortcutValue,
-        forward: forwardShortcutValue
+        forward: forwardShortcutValue,
+        sequential: sequentialShortcutVelue
     });
 
 
@@ -114,13 +120,17 @@ ipcMain.on('update-shortcuts', (event, data) => {
         forwardShortcut();
     });
 
+    const ret3 = globalShortcut.register(sequentialShortcutValue, () => {
+        sequentialShortcut();
+    });
 
-    if (!ret || !ret2) {
+    if (!ret || !ret2 || !ret3) {
         console.log('Registration of global shortcut failed.');
     }
 
     store.set('backwardShortcut', backwardShortcutValue);
     store.set('forwardShortcut', forwardShortcutValue);
+    store.set("sequentialShortcut", sequentialShortcutValue)
 });
 
 function createOverlay() {
@@ -217,6 +227,27 @@ function forwardShortcut() {
 
     }
 }
+
+function sequentialShortcut() {
+
+  // move to start position
+  while (firstPressToSeq && copiedHistory.length > 0) {
+    const textToPaste = copiedHistory.shift();
+    if (previousClip!== ""){
+      clipboardQueue.unshift(previousClip);
+      previousClip = textToPaste;
+    }
+  }
+  firstPressToSeq = false
+
+  forwardShortcut()
+
+  // simulate CTRL+V / CMD+V
+  setTimeout(() => {
+      robot.keyTap('v', process.platform==='darwin' ? 'command' : 'control')
+  }, 150)
+}
+
 function backwardShortcut() {
     if (copiedHistory.length > 0) {
         // go back in clipboard history
@@ -246,7 +277,7 @@ function createWindow() {
     }
 
     win = new BrowserWindow({
-        width: 600,
+        width: 800,
         height: 500,
         // dont allow resizing or zooming
         resizable: false,
@@ -332,17 +363,20 @@ app.whenReady().then(() => {
 
     const ret = globalShortcut.register(backwardShortcutValue, () => {
         backwardShortcut();
-
     });
 
     const ret2 = globalShortcut.register(forwardShortcutValue, () => {
         forwardShortcut();
+    });
 
+    const ret3 = globalShortcut.register(sequentialShortcutValue, () => {
+        sequentialShortcut();
     });
 
     win.webContents.send('shortcuts', {
         backward: backwardShortcutValue,
-        forward: forwardShortcutValue
+        forward: forwardShortcutValue,
+        sequential: sequentialShortcutValue
     });
 
     // Clipboard polling mechanism
@@ -364,6 +398,9 @@ app.whenReady().then(() => {
     }
     if (!ret2) {
         console.log('Registration of global shortcut failed.');
+    }
+    if (!ret3) {
+        console.log('Registration of global shortcut for sequantial paste is failed.');
     }
 
 });
@@ -387,6 +424,13 @@ ipcMain.on('set-queue', (event, data) => {
     clipboardQueue = data.split('\n');
 });
 
+ipcMain.on('clear-clipboard', (event, data) => {
+    firstPressToSeq = false
+    clipboardQueue = [];
+    copiedHistory = [];
+    previousClip = ""
+    clipboard.clear()
+});
 
 // ... other main process code ...
 
@@ -395,6 +439,7 @@ ipcMain.on('get-shortcuts', (event) => {
     // const shortcuts = getCurrentShortcuts();
     win.webContents.send('shortcuts', {
         backward: backwardShortcutValue,
-        forward: forwardShortcutValue
+        forward: forwardShortcutValue,
+        sequential: sequentialShortcutValue
     });
 });

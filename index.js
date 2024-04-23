@@ -10,13 +10,12 @@ const robot = require('robotjs')
 let win;
 let tray = null;
 let clipboardQueue = [];
-let clipboardQueueLimit = 50; // limit to 100 items, you can change this to any desired value
-let copiedHistory = []; // to store the last 10 copied items
-const copiedHistoryLimit = 50; // limit to 10 items, you can change this to any desired value
-let previousClip = '';  // to store the previous clipboard content
+let clipboardQueueLimit = 100; // limit to 100 items, you can change this to any desired value
+let currentClipPointer = -1
+
 let overlay;
 let overlayTimeout; // Declare this outside the showOverlay function
-let firstPressToSeq = true
+let seqStartPos = 0
 
 
 // When the app starts, retrieve stored shortcuts (if any):
@@ -206,41 +205,55 @@ function showOverlay(content) {
     }, 3000);
 }
 
+function showCurrentClip(){
+  const textToPaste = clipboardQueue[currentClipPointer]
+  clipboard.writeText(textToPaste);
+  showOverlay(textToPaste);
+}
+
+function forwardQueue(){
+  console.log("forward:", clipboardQueue, " currentClipPointer:", currentClipPointer)
+  if (currentClipPointer < clipboardQueue.length-1) {
+      currentClipPointer++
+  }
+}
+
+function backwardQueue(){
+  console.log("backward:", clipboardQueue, " currentClipPointer:", currentClipPointer)
+  if (currentClipPointer > 0) {
+    currentClipPointer--
+  } 
+}
+
 function forwardShortcut() {
-    if (clipboardQueue.length > 0) {
-        const textToPaste = clipboardQueue.shift();
-        clipboard.writeText(textToPaste);
-        copiedHistory.unshift(previousClip);
-        previousClip = textToPaste;
-        clipboard.writeText(textToPaste);
-        showOverlay(textToPaste);
+    forwardQueue()
+    showCurrentClip()
+    seqStartPos = currentClipPointer
+}
 
-        // if there is an item in the queue, 
-        while (clipboardQueue.length > clipboardQueueLimit) {
-            clipboardQueue.pop();
-        }
-
-
-
-    } else {
-        showOverlay(clipboard.readText());
-
-    }
+function backwardShortcut() {
+    backwardQueue()
+    showCurrentClip()
+    seqStartPos = currentClipPointer
 }
 
 function sequentialShortcut() {
 
-  // move to start position
-  while (firstPressToSeq && copiedHistory.length > 0) {
-    const textToPaste = copiedHistory.shift();
-    if (previousClip!== ""){
-      clipboardQueue.unshift(previousClip);
-      previousClip = textToPaste;
-    }
+  if (clipboardQueue.length === 0){
+    console.log("clipboard is empty")
+    return
   }
-  firstPressToSeq = false
 
-  forwardShortcut()
+  // seqStartPos is set to 0 at clipboard cleans,
+  // if forward or backward shortcuts are called it is set to last position
+  // otherwise it is a negative value, which means sequential paste is in progress
+  if (seqStartPos >= 0){
+    currentClipPointer = seqStartPos - 1
+    seqStartPos = -1
+  }
+
+  forwardQueue()
+  showCurrentClip()
 
   // simulate CTRL+V / CMD+V
   setTimeout(() => {
@@ -248,24 +261,8 @@ function sequentialShortcut() {
   }, 200)
 }
 
-function backwardShortcut() {
-    if (copiedHistory.length > 0) {
-        // go back in clipboard history
-        const textToPaste = copiedHistory.shift();
-        clipboardQueue.unshift(previousClip);
-        previousClip = textToPaste;
-        clipboard.writeText(textToPaste);
-        showOverlay(textToPaste);
-        // if there is an item in the queue, 
-        while (clipboardQueue.length > clipboardQueueLimit) {
-            clipboardQueue.pop();
-        }
 
-    } else {
-        showOverlay(clipboard.readText());
 
-    }
-}
 
 
 function createWindow() {
@@ -382,14 +379,22 @@ app.whenReady().then(() => {
     // Clipboard polling mechanism
     setInterval(() => {
         const currentClip = clipboard.readText();
-        if (currentClip !== previousClip) {
-            copiedHistory.unshift(previousClip);
-            previousClip = currentClip;
+        // if nothing is on clipboard, then nothing to do :)
+        if (currentClip === "")
+          return
 
-            // if there is an item in the queue, 
-            if (copiedHistory.length > copiedHistoryLimit) {
-                copiedHistory.pop();
-            }
+        // if clipboardQueue is empty or not same to the current clip,
+        // then this must be a new clipboard added by ctrl+C button 
+        if (clipboardQueue.length === 0 || currentClip !== clipboardQueue[currentClipPointer]) {
+            clipboardQueue.push(currentClip);
+            currentClipPointer++   
+        }
+
+        // if clipboardQueue is full, then delete the oldest item 
+        // after deletion, current clip pointer is also updated since first item from the queue is removed.
+        if (clipboardQueue.length === clipboardQueueLimit) {
+          clipboardQueue.shift();
+          currentClipPointer--
         }
     }, 100);  // Check every second
 
@@ -422,14 +427,15 @@ app.on('activate', () => {
 
 ipcMain.on('set-queue', (event, data) => {
     clipboardQueue = data.split('\n');
+    currentClipPointer = clipboardQueue.length-1
+    seqStartPos = 0
 });
 
 ipcMain.on('clear-clipboard', (event, data) => {
-    firstPressToSeq = true
-    clipboardQueue = [];
-    copiedHistory = [];
-    previousClip = ""
     clipboard.clear()
+    clipboardQueue = [];
+    currentClipPointer = -1
+    seqStartPos = 0
 });
 
 // ... other main process code ...

@@ -245,7 +245,7 @@ function sequentialShortcut() {
   // simulate CTRL+V / CMD+V
   setTimeout(() => {
       robot.keyTap('v', process.platform==='darwin' ? 'command' : 'control')
-  }, 150)
+  }, 200)
 }
 
 function backwardShortcut() {
@@ -425,7 +425,7 @@ ipcMain.on('set-queue', (event, data) => {
 });
 
 ipcMain.on('clear-clipboard', (event, data) => {
-    firstPressToSeq = false
+    firstPressToSeq = true
     clipboardQueue = [];
     copiedHistory = [];
     previousClip = ""

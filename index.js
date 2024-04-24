@@ -4,7 +4,7 @@ const store = new Store();
 const path = require('path');
 var AutoLaunch = require('auto-launch');
 const { autoUpdater } = require('electron-updater');
-const robot = require('robotjs')
+const { keyboard, Key } = require('@nut-tree/nut-js');
 
 
 let win;
@@ -17,6 +17,8 @@ let overlay;
 let overlayTimeout; // Declare this outside the showOverlay function
 let seqStartPos = 0
 
+// configure delay between keypresses for Cmd+V simulation
+keyboard.config.autoDelayMs = 200
 
 // When the app starts, retrieve stored shortcuts (if any):
 backwardShortcutValue = store.get('backwardShortcut', 'CmdOrCtrl+B');
@@ -206,6 +208,10 @@ function showOverlay(content) {
 }
 
 function showCurrentClip(){
+  if (currentClipPointer < 0 || currentClipPointer >= clipboardQueueLimit.length ){
+    console.log("currentClipPointer is out of range!", currentClipPointer)
+    return 
+  }
   const textToPaste = clipboardQueue[currentClipPointer]
   clipboard.writeText(textToPaste);
   showOverlay(textToPaste);
@@ -237,6 +243,16 @@ function backwardShortcut() {
     seqStartPos = currentClipPointer
 }
 
+async function simulateCmdV() {
+  try {
+      const cmdKey = process.platform === "darwin" ? Key.LeftCmd : Key.LeftCtrl
+      await keyboard.pressKey(cmdKey, Key.V)
+      await keyboard.releaseKey(cmdKey, Key.V)
+  } catch (error) {
+      console.error('Error:', error);
+  }
+}
+
 function sequentialShortcut() {
 
   if (clipboardQueue.length === 0){
@@ -254,11 +270,9 @@ function sequentialShortcut() {
 
   forwardQueue()
   showCurrentClip()
+  simulateCmdV()
 
-  // simulate CTRL+V / CMD+V
-  setTimeout(() => {
-      robot.keyTap('v', process.platform==='darwin' ? 'command' : 'control')
-  }, 200)
+
 }
 
 

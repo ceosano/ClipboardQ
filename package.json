@@ -5,13 +5,13 @@
   "description": "Quick Clipboard History + Copy and Paste in Sequence",
   "main": "index.js",
   "author": "Sandra Papo",
+  "license": "MIT",
   "scripts": {
     "start": "electron index.js",
     "test": "echo \"Error: no test specified\" && exit 1",
     "dist": "electron-builder -mw --publish always"
   },
   "dependencies": {
-    "auto-launch": "^5.0.6",
     "electron-is-dev": "^2.0.0",
     "electron-localshortcut": "^3.2.1",
     "electron-reload": "^2.0.0-alpha.1",
@@ -20,14 +20,28 @@
   },
   "devDependencies": {
     "electron": "^26.1.0",
-    "electron-builder": "^24.6.3",
-    "electron-rebuild": "^3.2.9"
+    "electron-builder": "^26.0.12"
   },
   "build": {
-    "publish": {
-      "provider": "s3",
-      "bucket": "clipboard-release",
-      "region": "us-east-1"
+    "appId": "com.2824908.clipboardq",
+    "mac": {
+      "category": "public.app-category.productivity",
+      "target": [
+        "dmg",
+        "mas"
+      ],
+      "entitlements": "entitlements.mas.plist",
+      "entitlementsInherit": "entitlements.mas.inherit.plist",
+      "hardenedRuntime": true,
+      "gatekeeperAssess": false,
+      "extendInfo": {
+        "NSClipboardUsageDescription": "ClipboardQ needs clipboard access to help you reuse copied content.",
+        "ElectronTeamId": "Y63V7L43S2"
+      }
+    },
+    "mas": {
+      "entitlements": "entitlements.mas.plist",
+      "entitlementsInherit": "entitlements.mas.inherit.plist"
     }
   }
 }

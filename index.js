@@ -2,9 +2,18 @@ const { app, BrowserWindow, ipcMain, clipboard, Tray, Menu, globalShortcut } = r
 const Store = require('electron-store');
 const store = new Store();
 const path = require('path');
-var AutoLaunch = require('auto-launch');
 const { autoUpdater } = require('electron-updater');
 
+function setupAutoLaunch() {
+    if (process.platform === 'darwin' || process.platform === 'win32') {
+      app.setLoginItemSettings({
+        openAtLogin: true,  // Always enable start at login
+        // On macOS, makes the app open in the background without focusing it
+        openAsHidden: true,
+      });
+    }
+  }
+  
 
 let win;
 let tray = null;
@@ -58,37 +67,7 @@ autoUpdater.on('update-available', () => {
   });
 
 // set up auto launch on mac
-
-if (process.platform === 'darwin') {
-    var macAutoLauncher = new AutoLaunch({
-        name: 'Clipboard Q',
-        path: '/Applications/Clipboard Q.app',
-
-    });
-
-    macAutoLauncher.isEnabled().then(function (isEnabled) {
-        if (isEnabled) return;
-        macAutoLauncher.enable();
-    }).catch(function (err) {
-        // handle error
-    });
-}
-
-if (process.platform === 'win32') {
-    // set up auto launch on windows
-    var winAutoLauncher = new AutoLaunch({
-        name: 'Clipboard Q',
-        path: 'C:\\Program Files\\Clipboard Q\\Clipboard Q.exe',
-
-    });
-
-    winAutoLauncher.isEnabled().then(function (isEnabled) {
-        if (isEnabled) return;
-        winAutoLauncher.enable();
-    }).catch(function (err) {
-        // handle error
-    });
-}
+setupAutoLaunch();
 
 ipcMain.on('update-shortcuts', (event, data) => {
 
@@ -236,6 +215,32 @@ function backwardShortcut() {
     }
 }
 
+function showDisclosureModal() {
+    const modalWindow = new BrowserWindow({
+      width: 600,
+      height: 400,
+      parent: win,
+      modal: true,
+      resizable: false,
+      minimizable: false,
+      maximizable: false,
+      title: 'ClipboardQ Permissions',
+      webPreferences: {
+        nodeIntegration: true,
+        contextIsolation: false
+      },
+    });
+  
+    modalWindow.setMenuBarVisibility(false);
+  
+    // Load HTML from separate file
+    modalWindow.loadFile(path.join(__dirname, 'disclosure-modal.html'));
+    
+    // Prevent closing the modal by clicking outside
+    modalWindow.setAlwaysOnTop(true);
+    
+    return modalWindow;
+  }
 
 function createWindow() {
     // on mac make title bar hidden and on windows make it visible
@@ -272,8 +277,23 @@ function createWindow() {
     });
 
     win.on('ready-to-show', () => {
-          autoUpdater.checkForUpdatesAndNotify();
-      });
+        if (!process.mas) {
+            autoUpdater.checkForUpdatesAndNotify();
+        }
+          
+        
+        // Show disclosure modal on first launch
+        if (!store.get('hasShownDisclosure', false)) {
+          const disclosureModal = showDisclosureModal();
+          
+          // If the disclosure modal is force closed, quit the app
+          disclosureModal.on('closed', () => {
+            if (!store.get('hasShownDisclosure', false)) {
+              app.quit();
+            }
+          });
+        }
+    });
 }
 
 function setupTray() {
@@ -398,3 +418,17 @@ ipcMain.on('get-shortcuts', (event) => {
         forward: forwardShortcutValue
     });
 });
+
+ipcMain.on('disclosure-accepted', () => {
+    store.set('hasShownDisclosure', true);
+    if (BrowserWindow.getAllWindows().length > 1) {
+      // Close the modal window (it should be the second window)
+      BrowserWindow.getAllWindows()[1].close();
+    }
+  });
+  
+ipcMain.on('disclosure-dismissed', () => {
+// User dismissed the disclosure, we should quit the app
+app.quit();
+});
+  

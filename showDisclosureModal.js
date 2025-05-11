@@ -1,0 +1,129 @@
+const { BrowserWindow } = require('electron');
+
+function showDisclosureModal() {
+    const modalWindow = new BrowserWindow({
+      width: 400,
+      height: 250,
+      parent: win,
+      modal: true,
+      resizable: false,
+      minimizable: false,
+      maximizable: false,
+      title: 'ClipboardQ Permissions',
+      webPreferences: {
+        nodeIntegration: true,
+        contextIsolation: false
+      },
+    });
+  
+    modalWindow.setMenuBarVisibility(false);
+    
+    // Create HTML content for the modal
+    const modalContent = `
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <meta charset="UTF-8">
+        <title>ClipboardQ Permissions</title>
+        <style>
+          body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            padding: 20px;
+            text-align: center;
+            background-color: #f5f5f7;
+            color: #333;
+            margin: 0;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+          }
+          .content {
+            flex-grow: 1;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+          }
+          h2 {
+            margin-top: 0;
+            margin-bottom: 20px;
+            font-weight: 500;
+          }
+          p {
+            margin-bottom: 20px;
+            line-height: 1.5;
+          }
+          .emoji {
+            font-size: 2em;
+            margin-bottom: 10px;
+          }
+          .buttons {
+            margin-top: auto;
+            display: flex;
+            justify-content: center;
+            gap: 10px;
+            padding-bottom: 20px;
+          }
+          button {
+            padding: 8px 20px;
+            border-radius: 6px;
+            border: none;
+            font-size: 14px;
+            cursor: pointer;
+          }
+          .secondary {
+            background-color: #e1e1e1;
+            color: #333;
+          }
+          .primary {
+            background-color: #007AFF;
+            color: white;
+          }
+          .learn-more {
+            margin-top: 10px;
+            font-size: 13px;
+            color: #007AFF;
+            text-decoration: underline;
+            cursor: pointer;
+          }
+        </style>
+      </head>
+      <body>
+        <div class="content">
+          <div class="emoji">📋</div>
+          <h2>ClipboardQ needs permission to monitor your clipboard</h2>
+          <p>Clipboard data is only stored locally and helps you quickly access past copies.</p>
+          <div class="learn-more" id="learnMore">Learn more</div>
+        </div>
+        <div class="buttons">
+          <button class="secondary" id="dismissBtn">Dismiss</button>
+          <button class="primary" id="continueBtn">Continue</button>
+        </div>
+        <script>
+          const { ipcRenderer, shell } = require('electron');
+          
+          document.getElementById('dismissBtn').addEventListener('click', () => {
+            ipcRenderer.send('disclosure-dismissed');
+          });
+          
+          document.getElementById('continueBtn').addEventListener('click', () => {
+            ipcRenderer.send('disclosure-accepted');
+          });
+          
+          document.getElementById('learnMore').addEventListener('click', () => {
+            // Replace with your actual privacy policy URL
+            shell.openExternal('https://yourapp.com/privacy-policy');
+          });
+        </script>
+      </body>
+      </html>
+    `;
+  
+    modalWindow.loadURL(`data:text/html;charset=utf-8,${encodeURIComponent(modalContent)}`);
+    
+    // Prevent closing the modal by clicking outside
+    modalWindow.setAlwaysOnTop(true);
+    
+    return modalWindow;
+  }
+  
+  module.exports = showDisclosureModal;
